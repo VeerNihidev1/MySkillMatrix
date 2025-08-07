@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #console {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Application Debug Page</h1>
+        
+        <div class="status info">
+            <strong>Debug Information:</strong><br>
+            Current URL: <span id="currentUrl"></span><br>
+            User Agent: <span id="userAgent"></span><br>
+            Timestamp: <span id="timestamp"></span>
+        </div>
+
+        <div class="status" id="appStatus">
+            <strong>Application Status:</strong> Checking...
+        </div>
+
+        <div>
+            <button onclick="checkMainApp()">Check Main App</button>
+            <button onclick="clearConsole()">Clear Console</button>
+            <button onclick="testLocalStorage()">Test LocalStorage</button>
+            <button onclick="checkNetworkRequests()">Check Network</button>
+        </div>
+
+        <h3>Console Output:</h3>
+        <div id="console"></div>
+
+        <h3>Quick Actions:</h3>
+        <div>
+            <button onclick="window.location.href='http://localhost:5174'">Go to Main App</button>
+            <button onclick="window.location.reload()">Reload Page</button>
+            <button onclick="clearAllData()">Clear All Data</button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize debug info
+        document.getElementById('currentUrl').textContent = window.location.href;
+        document.getElementById('userAgent').textContent = navigator.userAgent;
+        document.getElementById('timestamp').textContent = new Date().toLocaleString();
+
+        // Console capture
+        const consoleDiv = document.getElementById('console');
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        function addToConsole(type, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            consoleDiv.textContent += `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToConsole('log', args.join(' '));
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToConsole('error', args.join(' '));
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addToConsole('warn', args.join(' '));
+        };
+
+        // Capture unhandled errors
+        window.addEventListener('error', function(e) {
+            addToConsole('error', `Unhandled Error: ${e.message} at ${e.filename}:${e.lineno}`);
+        });
+
+        window.addEventListener('unhandledrejection', function(e) {
+            addToConsole('error', `Unhandled Promise Rejection: ${e.reason}`);
+        });
+
+        function clearConsole() {
+            consoleDiv.textContent = '';
+        }
+
+        function checkMainApp() {
+            console.log('Checking main application...');
+            
+            fetch('http://localhost:5174')
+                .then(response => {
+                    if (response.ok) {
+                        document.getElementById('appStatus').className = 'status success';
+                        document.getElementById('appStatus').innerHTML = '<strong>Application Status:</strong> ✅ Server is running and responding';
+                        console.log('Main app server is responding correctly');
+                        return response.text();
+                    } else {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                })
+                .then(html => {
+                    if (html.includes('<div id="root">')) {
+                        console.log('✅ HTML structure looks correct');
+                    } else {
+                        console.warn('⚠️ HTML structure might be incorrect');
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('appStatus').className = 'status error';
+                    document.getElementById('appStatus').innerHTML = '<strong>Application Status:</strong> ❌ Server not responding';
+                    console.error('Failed to connect to main app:', error.message);
+                });
+        }
+
+        function testLocalStorage() {
+            console.log('Testing localStorage...');
+            try {
+                // Test basic localStorage functionality
+                localStorage.setItem('test', 'value');
+                const value = localStorage.getItem('test');
+                localStorage.removeItem('test');
+                
+                if (value === 'value') {
+                    console.log('✅ localStorage is working correctly');
+                } else {
+                    console.error('❌ localStorage test failed');
+                }
+
+                // Check for existing app data
+                const keys = Object.keys(localStorage);
+                console.log('Existing localStorage keys:', keys);
+                
+                keys.forEach(key => {
+                    if (key.includes('skill') || key.includes('user') || key.includes('auth')) {
+                        console.log(`Found app data: ${key}`);
+                    }
+                });
+                
+            } catch (error) {
+                console.error('localStorage error:', error.message);
+            }
+        }
+
+        function checkNetworkRequests() {
+            console.log('Checking network requests...');
+            
+            // Check if we can load the main JS bundle
+            fetch('http://localhost:5174/src/main.tsx')
+                .then(response => {
+                    if (response.ok) {
+                        console.log('✅ Main TypeScript file is accessible');
+                    } else {
+                        console.warn('⚠️ Main TypeScript file might not be accessible');
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Failed to access main TypeScript file:', error.message);
+                });
+        }
+
+        function clearAllData() {
+            console.log('Clearing all application data...');
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                console.log('✅ All storage cleared');
+                
+                // Clear cookies (if any)
+                document.cookie.split(";").forEach(function(c) { 
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                });
+                console.log('✅ Cookies cleared');
+                
+            } catch (error) {
+                console.error('❌ Failed to clear data:', error.message);
+            }
+        }
+
+        // Auto-check on load
+        setTimeout(checkMainApp, 1000);
+        
+        console.log('🔍 Debug page loaded successfully');
+        console.log('Use the buttons above to diagnose issues with the main application');
+    </script>
+</body>
+</html>
